@@ -2,7 +2,6 @@ from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 import logging
-from typing import Any
 from app.config.env_config import Config
 
 # Configure logging
@@ -13,8 +12,8 @@ class DatabaseConnection:
     """MongoDB database connection manager."""
     
     def __init__(self):
-        self.client: MongoClient[dict[str, Any]] | None = None
-        self.database: Database[dict[str, Any]] | None = None
+        self.client: MongoClient[dict[str, object]] | None = None
+        self.database: Database[dict[str, object]] | None = None
         self.config: Config = Config()
     
     def connect(self) -> bool:
@@ -54,7 +53,7 @@ class DatabaseConnection:
             self.client.close()
             logger.info("MongoDB disconnected")
     
-    def get_database(self) -> Database[dict[str, Any]] | None:
+    def get_database(self) -> Database[dict[str, object]] | None:
         """
         Get the database instance.
         
@@ -94,7 +93,7 @@ def disconnect_database() -> None:
     """Disconnect the global database connection."""
     db_connection.disconnect()
 
-def get_database() -> Database[dict[str, Any]] | None:
+def get_database() -> Database[dict[str, object]] | None:
     """
     Get the database instance from the global connection.
     

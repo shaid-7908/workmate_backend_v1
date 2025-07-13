@@ -1,0 +1,234 @@
+from fastapi import APIRouter, HTTPException, status
+from app.model.product_schema import ProductSchema
+from app.types.product_types import ProductCreateSchema, ProductUpdateSchema
+from app.controller.product_controller import ProductController
+
+# Create router
+router = APIRouter(
+    prefix="/api/products",
+    tags=["products"],
+    responses={404: {"description": "Not found"}}
+)
+
+# Initialize controller
+product_controller = ProductController()
+
+@router.post("/", status_code=status.HTTP_201_CREATED)
+async def create_new_product(product_data: ProductCreateSchema):
+    """
+    Create a new product.
+    
+    Args:
+        product_data: Product data including variants, vendor, tags, etc.
+        
+    Returns:
+        dict: Created product with MongoDB _id
+        
+    Raises:
+        HTTPException: If product creation fails
+    """
+    try:
+        created_product = product_controller.create_product(product_data)
+        return {
+            "success": True,
+            "message": "Product created successfully",
+            "data": created_product
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to create product: {str(e)}"
+        )
+
+@router.post("/with-schema", status_code=status.HTTP_201_CREATED)
+async def create_product_using_schema(product: ProductSchema):
+    """
+    Create a new product using ProductSchema validation.
+    
+    Args:
+        product: ProductSchema instance with validated data
+        
+    Returns:
+        dict: Created product with MongoDB _id
+        
+    Raises:
+        HTTPException: If product creation fails
+    """
+    try:
+        created_product = product_controller.create_product_with_schema(product)
+        return {
+            "success": True,
+            "message": "Product created successfully",
+            "data": created_product
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to create product: {str(e)}"
+        )
+
+@router.get("/{product_id}")
+async def get_product(product_id: str):
+    """
+    Get a product by its ID.
+    
+    Args:
+        product_id: Product ID as string
+        
+    Returns:
+        dict: Product data or error message
+        
+    Raises:
+        HTTPException: If product not found
+    """
+    try:
+        product = product_controller.get_product_by_id(product_id)
+        if product:
+            return {
+                "success": True,
+                "message": "Product retrieved successfully",
+                "data": product
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Product with ID {product_id} not found"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving product: {str(e)}"
+        )
+
+@router.get("/store/{store_id}")
+async def get_products_by_store_id(store_id: str):
+    """
+    Get all products for a specific store.
+    
+    Args:
+        store_id: Store ID as string
+        
+    Returns:
+        dict: List of products for the store
+        
+    Raises:
+        HTTPException: If error occurs
+    """
+    try:
+        products = product_controller.get_products_by_store(store_id)
+        return {
+            "success": True,
+            "message": f"Retrieved {len(products)} products for store {store_id}",
+            "data": products,
+            "count": len(products)
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving products for store: {str(e)}"
+        )
+
+@router.get("/")
+async def get_all_products():
+    """
+    Get all products (placeholder for pagination).
+    
+    Returns:
+        dict: List of all products
+        
+    Raises:
+        HTTPException: If error occurs
+    """
+    try:
+        # This is a placeholder - you might want to add pagination
+        # For now, we'll return a message indicating this endpoint needs implementation
+        return {
+            "success": True,
+            "message": "Get all products endpoint - implement pagination",
+            "data": [],
+            "count": 0
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving products: {str(e)}"
+        )
+
+@router.put("/{product_id}")
+async def update_product(product_id: str, product_data: ProductUpdateSchema):
+    """
+    Update a product by its ID.
+    
+    Args:
+        product_id: Product ID as string
+        product_data: Updated product data
+        
+    Returns:
+        dict: Updated product data
+        
+    Raises:
+        HTTPException: If product not found or update fails
+    """
+    try:
+        # First check if product exists
+        existing_product = product_controller.get_product_by_id(product_id)
+        if not existing_product:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Product with ID {product_id} not found"
+            )
+        
+        # TODO: Implement update logic in controller
+        # For now, return a placeholder response
+        return {
+            "success": True,
+            "message": "Product update endpoint - implement in controller",
+            "data": existing_product
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating product: {str(e)}"
+        )
+
+@router.delete("/{product_id}")
+async def delete_product(product_id: str):
+    """
+    Delete a product by its ID.
+    
+    Args:
+        product_id: Product ID as string
+        
+    Returns:
+        dict: Success message
+        
+    Raises:
+        HTTPException: If product not found or deletion fails
+    """
+    try:
+        # First check if product exists
+        existing_product = product_controller.get_product_by_id(product_id)
+        if not existing_product:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Product with ID {product_id} not found"
+            )
+        
+        # TODO: Implement delete logic in controller
+        # For now, return a placeholder response
+        return {
+            "success": True,
+            "message": "Product delete endpoint - implement in controller",
+            "data": {"deleted_id": product_id}
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error deleting product: {str(e)}"
+        ) 

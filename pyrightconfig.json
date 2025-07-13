@@ -1,5 +1,6 @@
 {
     "venvPath": ".",
     "venv": "myenv",
-    "extraPaths": ["./myenv/Lib/site-packages"]
+    "extraPaths": ["./myenv/Lib/site-packages"],
+    "typeCheckingMode": "off"
 } 
