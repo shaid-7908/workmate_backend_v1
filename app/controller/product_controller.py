@@ -45,7 +45,6 @@ class ProductController:
             product_datas: List of product data to create
         """
         product_datas = self.get_products_from_shopify()
-        print(product_datas['products'])
         for product_data in product_datas['products']:
             pprint(product_data,sort_dicts=False)
             
@@ -93,7 +92,6 @@ class ProductController:
             # Create ProductCreateSchema instance from the data
             product_schema = ProductCreateSchema(**data_to_create)
             self.create_product(product_schema)
-            print("-" * 80)
     
     def create_product_with_schema(self, product: ProductSchema) -> dict[str, object]:
         """

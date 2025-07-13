@@ -6,6 +6,7 @@ import logging
 from app.config.env_config import Config
 from app.config.db_connection import connect_database, get_database, disconnect_database
 from app.routes.product_routes import router as product_router
+from app.routes.order_routes import router as order_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -53,6 +54,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(product_router)
+app.include_router(order_router)
 
 @app.get("/")
 async def root():
