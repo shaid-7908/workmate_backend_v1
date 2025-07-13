@@ -40,6 +40,14 @@ async def create_new_product(product_data: ProductCreateSchema):
             detail=f"Failed to create product: {str(e)}"
         )
 
+@router.post("/from-shopify", status_code=status.HTTP_201_CREATED)
+async def create_product_from_shopify():
+    product_controller.create_product_from_shopify()
+    return {
+        "success": True,
+        "message": "Product created successfully"
+    }
+
 @router.post("/with-schema", status_code=status.HTTP_201_CREATED)
 async def create_product_using_schema(product: ProductSchema):
     """
