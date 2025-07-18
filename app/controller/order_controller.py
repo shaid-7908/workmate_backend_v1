@@ -42,7 +42,7 @@ class OrderController:
         """
         url = f"https://{self.config.SHOPIFY_STORE_NAME}/admin/api/2023-10/orders.json"
         params = {
-            "limit": limit
+            "limit": 250
         }
         
         if status:
@@ -294,3 +294,12 @@ class OrderController:
         # TODO: Implement delete logic in repository
         # For now, return False to indicate not implemented
         return False 
+
+    def get_total_units_sold_per_product(self) -> list[dict[str, object]]:
+        """
+        Get total units sold per product by aggregating all order line items.
+        
+        Returns:
+            list[dict]: List with product_id, total_quantity_sold, and total_orders
+        """
+        return self.repository.get_total_units_sold_per_product() 

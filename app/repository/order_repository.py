@@ -301,3 +301,53 @@ class OrderRepository:
         except Exception as e:
             print(f"Error getting all orders: {str(e)}")
             return [] 
+
+    def get_total_units_sold_per_product(self) -> list[dict[str, object]]:
+        """
+        Get total units sold per product by aggregating all order line items.
+        
+        Returns:
+            list[dict]: List with product_id, total_quantity_sold, and total_orders
+        """
+        try:
+            collection = self._get_collection()
+            if collection is None:
+                return []
+            
+            # MongoDB aggregation pipeline to sum quantities by product_id
+            pipeline = [
+                # Unwind the line_items array to process each item separately
+                {"$unwind": "$line_items"},
+                
+                # Group by product_id and sum quantities
+                {
+                    "$group": {
+                        "_id": "$line_items.product_id",
+                        "total_quantity_sold": {"$sum": "$line_items.quantity"},
+                        "total_orders": {"$sum": 1},
+                        "total_revenue": {"$sum": {"$multiply": ["$line_items.quantity", {"$toDouble": "$total_price"}]}}
+                    }
+                },
+                
+                # Sort by total quantity sold in descending order
+                {"$sort": {"total_quantity_sold": -1}},
+                
+                # Rename _id field to product_id for clarity
+                {
+                    "$project": {
+                        "product_id": "$_id",
+                        "total_quantity_sold": 1,
+                        "total_orders": 1,
+                        "total_revenue": 1,
+                        "_id": 0
+                    }
+                }
+            ]
+            
+            # Execute aggregation
+            result = list(collection.aggregate(pipeline))
+            return result
+            
+        except Exception as e:
+            print(f"Error getting total units sold per product: {str(e)}")
+            return [] 

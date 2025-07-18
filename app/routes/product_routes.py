@@ -75,7 +75,7 @@ async def create_product_using_schema(product: ProductSchema):
             detail=f"Failed to create product: {str(e)}"
         )
 
-@router.get("/{product_id}")
+@router.get("/get-product-by-id/{product_id}")
 async def get_product(product_id: str):
     """
     Get a product by its ID.
@@ -149,6 +149,7 @@ async def get_all_products():
     Raises:
         HTTPException: If error occurs
     """
+    print("Getting all products =================================")
     try:
         # This is a placeholder - you might want to add pagination
         # For now, we'll return a message indicating this endpoint needs implementation
@@ -164,7 +165,33 @@ async def get_all_products():
             detail=f"Error retrieving products: {str(e)}"
         )
 
-@router.put("/{product_id}")
+@router.get("/units-sold")
+async def get_total_units_sold_per_product_route():
+    """
+    Get total units sold per product by aggregating all order line items.
+    
+    Returns:
+        dict: List with product analytics including total units sold, orders count, and revenue
+        
+    Raises:
+        HTTPException: If error occurs
+    """
+    print("Getting total units sold per product =================================")
+    try:
+        units_sold_data = product_controller.get_total_units_sold_per_product()
+        return {
+            "success": True,
+            "message": f"Retrieved sales data for {len(units_sold_data)} products",
+            "data": units_sold_data,
+            "count": len(units_sold_data)
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving units sold per product: {str(e)}"
+        )
+
+@router.put("/update-product-by-id/{product_id}")
 async def update_product(product_id: str, product_data: ProductUpdateSchema):
     """
     Update a product by its ID.

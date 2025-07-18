@@ -1,5 +1,6 @@
 from app import config
 from app.repository.product_repository import ProductRepository
+from app.repository.order_repository import OrderRepository
 from app.model.product_schema import ProductSchema
 from app.types.product_types import ProductCreateSchema, ProductVariantCreateSchema, ProductImageCreateSchema
 from app.config.env_config import Config
@@ -12,6 +13,7 @@ class ProductController:
     
     def __init__(self):
         self.repository = ProductRepository()
+        self.order_repository = OrderRepository()
         self.config = Config()
 
     def create_product(self, product_data: ProductCreateSchema) -> dict[str, object]:
@@ -166,3 +168,13 @@ class ProductController:
         # TODO: Implement delete logic in repository
         # For now, return False to indicate not implemented
         return False
+
+    def get_total_units_sold_per_product(self) -> list[dict[str, object]]:
+        """
+        Get total units sold per product by aggregating all order line items.
+        
+        Returns:
+            list[dict]: List with product_id, total_quantity_sold, and total_orders
+        """
+        print("Getting total units sold per product")
+        return self.order_repository.get_total_units_sold_per_product()
