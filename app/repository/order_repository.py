@@ -444,4 +444,219 @@ class OrderRepository:
             
         except Exception as e:
             print(f"Error getting total revenue per product: {str(e)}")
+            return []
+
+    def get_sales_by_week(self, year: int = None) -> list[dict[str, object]]:
+        """
+        Get sales data grouped by week.
+        
+        Args:
+            year: Filter by specific year (optional)
+            
+        Returns:
+            list[dict]: List with week number, year, total_sales, order_count, and date range
+        """
+        try:
+            collection = self._get_collection()
+            if collection is None:
+                return []
+            
+            # Build match stage for year filter
+            match_stage = {}
+            if year:
+                match_stage = {
+                    "created_at": {
+                        "$gte": datetime(year, 1, 1),
+                        "$lt": datetime(year + 1, 1, 1)
+                    }
+                }
+            
+            # MongoDB aggregation pipeline to group by week
+            pipeline = [
+                {"$match": match_stage},
+                
+                # Add week and year fields
+                {
+                    "$addFields": {
+                        "week": {"$week": "$created_at"},
+                        "year": {"$year": "$created_at"},
+                        "yearWeek": {
+                            "$concat": [
+                                {"$toString": {"$year": "$created_at"}},
+                                "-W",
+                                {
+                                    "$cond": {
+                                        "if": {"$lt": [{"$week": "$created_at"}, 10]},
+                                        "then": {"$concat": ["0", {"$toString": {"$week": "$created_at"}}]},
+                                        "else": {"$toString": {"$week": "$created_at"}}
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                
+                # Group by year and week
+                {
+                    "$group": {
+                        "_id": {
+                            "year": "$year",
+                            "week": "$week",
+                            "yearWeek": "$yearWeek"
+                        },
+                        "total_sales": {"$sum": {"$toDouble": "$total_price"}},
+                        "total_revenue": {"$sum": {"$toDouble": "$subtotal_price"}},
+                        "total_tax": {"$sum": {"$toDouble": "$total_tax"}},
+                        "total_discounts": {"$sum": {"$toDouble": "$total_discounts"}},
+                        "order_count": {"$sum": 1},
+                        "week_start": {"$min": "$created_at"},
+                        "week_end": {"$max": "$created_at"}
+                    }
+                },
+                
+                # Sort by year and week
+                {"$sort": {"_id.year": 1, "_id.week": 1}},
+                
+                # Format output
+                {
+                    "$project": {
+                        "year": "$_id.year",
+                        "week": "$_id.week",
+                        "year_week": "$_id.yearWeek",
+                        "total_sales": {"$round": ["$total_sales", 2]},
+                        "total_revenue": {"$round": ["$total_revenue", 2]},
+                        "total_tax": {"$round": ["$total_tax", 2]},
+                        "total_discounts": {"$round": ["$total_discounts", 2]},
+                        "order_count": 1,
+                        "week_start": {"$dateToString": {"format": "%Y-%m-%d", "date": "$week_start"}},
+                        "week_end": {"$dateToString": {"format": "%Y-%m-%d", "date": "$week_end"}},
+                        "_id": 0
+                    }
+                }
+            ]
+            
+            # Execute aggregation
+            result = list(collection.aggregate(pipeline))
+            
+            return result
+            
+        except Exception as e:
+            print(f"Error getting sales by week: {str(e)}")
+            return []
+
+    def get_sales_by_month(self, year: int = None) -> list[dict[str, object]]:
+        """
+        Get sales data grouped by month.
+        
+        Args:
+            year: Filter by specific year (optional)
+            
+        Returns:
+            list[dict]: List with month, year, total_sales, order_count, and month name
+        """
+        try:
+            collection = self._get_collection()
+            if collection is None:
+                return []
+            
+            # Build match stage for year filter
+            match_stage = {}
+            if year:
+                match_stage = {
+                    "created_at": {
+                        "$gte": datetime(year, 1, 1),
+                        "$lt": datetime(year + 1, 1, 1)
+                    }
+                }
+            
+            # MongoDB aggregation pipeline to group by month
+            pipeline = [
+                {"$match": match_stage},
+                
+                # Add month and year fields
+                {
+                    "$addFields": {
+                        "month": {"$month": "$created_at"},
+                        "year": {"$year": "$created_at"},
+                        "yearMonth": {
+                            "$concat": [
+                                {"$toString": {"$year": "$created_at"}},
+                                "-",
+                                {
+                                    "$cond": {
+                                        "if": {"$lt": [{"$month": "$created_at"}, 10]},
+                                        "then": {"$concat": ["0", {"$toString": {"$month": "$created_at"}}]},
+                                        "else": {"$toString": {"$month": "$created_at"}}
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                
+                # Group by year and month
+                {
+                    "$group": {
+                        "_id": {
+                            "year": "$year",
+                            "month": "$month",
+                            "yearMonth": "$yearMonth"
+                        },
+                        "total_sales": {"$sum": {"$toDouble": "$total_price"}},
+                        "total_revenue": {"$sum": {"$toDouble": "$subtotal_price"}},
+                        "total_tax": {"$sum": {"$toDouble": "$total_tax"}},
+                        "total_discounts": {"$sum": {"$toDouble": "$total_discounts"}},
+                        "order_count": {"$sum": 1},
+                        "month_start": {"$min": "$created_at"},
+                        "month_end": {"$max": "$created_at"}
+                    }
+                },
+                
+                # Sort by year and month
+                {"$sort": {"_id.year": 1, "_id.month": 1}},
+                
+                # Format output with month names
+                {
+                    "$project": {
+                        "year": "$_id.year",
+                        "month": "$_id.month",
+                        "year_month": "$_id.yearMonth",
+                        "month_name": {
+                            "$switch": {
+                                "branches": [
+                                    {"case": {"$eq": ["$_id.month", 1]}, "then": "January"},
+                                    {"case": {"$eq": ["$_id.month", 2]}, "then": "February"},
+                                    {"case": {"$eq": ["$_id.month", 3]}, "then": "March"},
+                                    {"case": {"$eq": ["$_id.month", 4]}, "then": "April"},
+                                    {"case": {"$eq": ["$_id.month", 5]}, "then": "May"},
+                                    {"case": {"$eq": ["$_id.month", 6]}, "then": "June"},
+                                    {"case": {"$eq": ["$_id.month", 7]}, "then": "July"},
+                                    {"case": {"$eq": ["$_id.month", 8]}, "then": "August"},
+                                    {"case": {"$eq": ["$_id.month", 9]}, "then": "September"},
+                                    {"case": {"$eq": ["$_id.month", 10]}, "then": "October"},
+                                    {"case": {"$eq": ["$_id.month", 11]}, "then": "November"},
+                                    {"case": {"$eq": ["$_id.month", 12]}, "then": "December"}
+                                ],
+                                "default": "Unknown"
+                            }
+                        },
+                        "total_sales": {"$round": ["$total_sales", 2]},
+                        "total_revenue": {"$round": ["$total_revenue", 2]},
+                        "total_tax": {"$round": ["$total_tax", 2]},
+                        "total_discounts": {"$round": ["$total_discounts", 2]},
+                        "order_count": 1,
+                        "month_start": {"$dateToString": {"format": "%Y-%m-%d", "date": "$month_start"}},
+                        "month_end": {"$dateToString": {"format": "%Y-%m-%d", "date": "$month_end"}},
+                        "_id": 0
+                    }
+                }
+            ]
+            
+            # Execute aggregation
+            result = list(collection.aggregate(pipeline))
+            
+            return result
+            
+        except Exception as e:
+            print(f"Error getting sales by month: {str(e)}")
             return [] 

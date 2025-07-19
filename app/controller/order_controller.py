@@ -311,4 +311,28 @@ class OrderController:
         Returns:
             list[dict]: List with product_id, total_revenue, total_quantity_sold, and average_price
         """
-        return self.repository.get_total_revenue_per_product() 
+        return self.repository.get_total_revenue_per_product()
+
+    def get_sales_by_week(self, year: int = None) -> list[dict[str, object]]:
+        """
+        Get sales data grouped by week.
+        
+        Args:
+            year: Filter by specific year (optional)
+            
+        Returns:
+            list[dict]: List with week number, year, total_sales, order_count, and date range
+        """
+        return self.repository.get_sales_by_week(year)
+
+    def get_sales_by_month(self, year: int = None) -> list[dict[str, object]]:
+        """
+        Get sales data grouped by month.
+        
+        Args:
+            year: Filter by specific year (optional)
+            
+        Returns:
+            list[dict]: List with month, year, total_sales, order_count, and month name
+        """
+        return self.repository.get_sales_by_month(year) 

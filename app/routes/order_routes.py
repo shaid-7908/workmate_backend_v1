@@ -369,4 +369,159 @@ async def delete_order(order_id: str):
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error deleting order: {str(e)}"
+        )
+
+@router.get("/analytics/sales/weekly")
+async def get_sales_by_week(
+    year: Optional[int] = Query(default=None, description="Filter by specific year (e.g., 2024)")
+):
+    """
+    Get sales data grouped by week.
+    
+    Args:
+        year: Filter by specific year (optional)
+        
+    Returns:
+        dict: Sales data grouped by week with totals and order counts
+        
+    Raises:
+        HTTPException: If error occurs
+    """
+    try:
+        sales_data = order_controller.get_sales_by_week(year)
+        
+        # Calculate summary statistics
+        total_sales = sum(item.get('total_sales', 0) for item in sales_data)
+        total_orders = sum(item.get('order_count', 0) for item in sales_data)
+        total_weeks = len(sales_data)
+        
+        return {
+            "success": True,
+            "message": f"Retrieved weekly sales data{f' for year {year}' if year else ''}",
+            "data": sales_data,
+            "summary": {
+                "total_sales": round(total_sales, 2),
+                "total_orders": total_orders,
+                "total_weeks": total_weeks,
+                "average_sales_per_week": round(total_sales / total_weeks if total_weeks > 0 else 0, 2),
+                "average_orders_per_week": round(total_orders / total_weeks if total_weeks > 0 else 0, 2),
+                "year_filter": year
+            }
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving weekly sales data: {str(e)}"
+        )
+
+@router.get("/analytics/sales/monthly")
+async def get_sales_by_month(
+    year: Optional[int] = Query(default=None, description="Filter by specific year (e.g., 2024)")
+):
+    """
+    Get sales data grouped by month.
+    
+    Args:
+        year: Filter by specific year (optional)
+        
+    Returns:
+        dict: Sales data grouped by month with totals and order counts
+        
+    Raises:
+        HTTPException: If error occurs
+    """
+    try:
+        sales_data = order_controller.get_sales_by_month(year)
+        
+        # Calculate summary statistics
+        total_sales = sum(item.get('total_sales', 0) for item in sales_data)
+        total_orders = sum(item.get('order_count', 0) for item in sales_data)
+        total_months = len(sales_data)
+        
+        return {
+            "success": True,
+            "message": f"Retrieved monthly sales data{f' for year {year}' if year else ''}",
+            "data": sales_data,
+            "summary": {
+                "total_sales": round(total_sales, 2),
+                "total_orders": total_orders,
+                "total_months": total_months,
+                "average_sales_per_month": round(total_sales / total_months if total_months > 0 else 0, 2),
+                "average_orders_per_month": round(total_orders / total_months if total_months > 0 else 0, 2),
+                "year_filter": year
+            }
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving monthly sales data: {str(e)}"
+        )
+
+# Analytics routes for product performance
+@router.get("/analytics/products/units-sold")
+async def get_total_units_sold_per_product():
+    """
+    Get total units sold per product.
+    
+    Returns:
+        dict: List of products with total quantities sold and order counts
+        
+    Raises:
+        HTTPException: If error occurs
+    """
+    try:
+        product_data = order_controller.get_total_units_sold_per_product()
+        
+        # Calculate summary statistics
+        total_units = sum(item.get('total_quantity_sold', 0) for item in product_data)
+        total_products = len(product_data)
+        
+        return {
+            "success": True,
+            "message": f"Retrieved units sold data for {total_products} products",
+            "data": product_data,
+            "summary": {
+                "total_units_sold": total_units,
+                "total_products": total_products,
+                "average_units_per_product": round(total_units / total_products if total_products > 0 else 0, 2)
+            }
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving product units sold data: {str(e)}"
+        )
+
+@router.get("/analytics/products/revenue")
+async def get_total_revenue_per_product():
+    """
+    Get total revenue per product.
+    
+    Returns:
+        dict: List of products with total revenue and sales metrics
+        
+    Raises:
+        HTTPException: If error occurs
+    """
+    try:
+        product_data = order_controller.get_total_revenue_per_product()
+        
+        # Calculate summary statistics
+        total_revenue = sum(item.get('total_revenue', 0) for item in product_data)
+        total_products = len(product_data)
+        
+        return {
+            "success": True,
+            "message": f"Retrieved revenue data for {total_products} products",
+            "data": product_data,
+            "summary": {
+                "total_revenue": round(total_revenue, 2),
+                "total_products": total_products,
+                "average_revenue_per_product": round(total_revenue / total_products if total_products > 0 else 0, 2)
+            }
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving product revenue data: {str(e)}"
         ) 
