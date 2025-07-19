@@ -178,3 +178,13 @@ class ProductController:
         """
         print("Getting total units sold per product")
         return self.order_repository.get_total_units_sold_per_product()
+
+    def get_total_revenue_per_product(self) -> list[dict[str, object]]:
+        """
+        Get total revenue per product by proportionally distributing order totals.
+        
+        Returns:
+            list[dict]: List with product_id, total_revenue, total_quantity_sold, and average_price
+        """
+        print("Getting total revenue per product")
+        return self.order_repository.get_total_revenue_per_product()

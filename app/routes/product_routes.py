@@ -166,7 +166,7 @@ async def get_all_products():
         )
 
 @router.get("/units-sold")
-async def get_total_units_sold_per_product_route():
+async def get_units_sold_per_product():
     """
     Get total units sold per product by aggregating all order line items.
     
@@ -189,6 +189,32 @@ async def get_total_units_sold_per_product_route():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving units sold per product: {str(e)}"
+        )
+
+@router.get("/revenue")
+async def get_revenue_per_product():
+    """
+    Get total revenue per product by proportionally distributing order totals.
+    
+    Returns:
+        dict: List with product revenue analytics including total revenue, quantities, and average price
+        
+    Raises:
+        HTTPException: If error occurs
+    """
+    print("Getting total revenue per product =================================")
+    try:
+        revenue_data = product_controller.get_total_revenue_per_product()
+        return {
+            "success": True,
+            "message": f"Retrieved revenue data for {len(revenue_data)} products",
+            "data": revenue_data,
+            "count": len(revenue_data)
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving revenue per product: {str(e)}"
         )
 
 @router.put("/update-product-by-id/{product_id}")

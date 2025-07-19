@@ -346,8 +346,102 @@ class OrderRepository:
             
             # Execute aggregation
             result = list(collection.aggregate(pipeline))
+            
             return result
             
         except Exception as e:
             print(f"Error getting total units sold per product: {str(e)}")
+            return []
+
+    def get_total_revenue_per_product(self) -> list[dict[str, object]]:
+        """
+        Get total revenue per product by proportionally distributing order totals.
+        Revenue is calculated by distributing each order's subtotal based on line item quantities.
+        
+        Returns:
+            list[dict]: List with product_id, total_revenue, total_quantity_sold, and average_price
+        """
+        try:
+            collection = self._get_collection()
+            if collection is None:
+                return []
+            
+            # MongoDB aggregation pipeline to calculate revenue per product
+            pipeline = [
+                # Add total order quantity before unwinding
+                {
+                    "$addFields": {
+                        "order_total_quantity": {
+                            "$sum": "$line_items.quantity"
+                        }
+                    }
+                },
+                
+                # Unwind the line_items array to process each item separately
+                {"$unwind": "$line_items"},
+                
+                # Calculate proportional revenue for each line item
+                {
+                    "$addFields": {
+                        "line_item_revenue": {
+                            "$cond": {
+                                "if": {"$gt": ["$order_total_quantity", 0]},
+                                "then": {
+                                    "$multiply": [
+                                        {"$toDouble": "$subtotal_price"},
+                                        {"$divide": ["$line_items.quantity", "$order_total_quantity"]}
+                                    ]
+                                },
+                                "else": 0
+                            }
+                        }
+                    }
+                },
+                
+                # Group by product_id to sum revenue and quantities
+                {
+                    "$group": {
+                        "_id": "$line_items.product_id",
+                        "total_revenue": {"$sum": "$line_item_revenue"},
+                        "total_quantity_sold": {"$sum": "$line_items.quantity"},
+                        "total_orders": {"$sum": 1}
+                    }
+                },
+                
+                # Calculate average price per unit across all orders
+                {
+                    "$addFields": {
+                        "average_price_per_unit": {
+                            "$cond": {
+                                "if": {"$gt": ["$total_quantity_sold", 0]},
+                                "then": {"$divide": ["$total_revenue", "$total_quantity_sold"]},
+                                "else": 0
+                            }
+                        }
+                    }
+                },
+                
+                # Sort by total revenue in descending order
+                {"$sort": {"total_revenue": -1}},
+                
+                # Rename _id field to product_id for clarity and round values
+                {
+                    "$project": {
+                        "product_id": "$_id",
+                        "total_revenue": {"$round": ["$total_revenue", 2]},
+                        "total_quantity_sold": 1,
+                        "total_orders": 1,
+                        "average_price_per_unit": {"$round": ["$average_price_per_unit", 2]},
+                        "_id": 0
+                    }
+                }
+            ]
+            
+            # Execute aggregation
+            result = list(collection.aggregate(pipeline))
+            
+            return result
+            
+        except Exception as e:
+            print(f"Error getting total revenue per product: {str(e)}")
             return [] 
