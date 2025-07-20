@@ -659,4 +659,300 @@ class OrderRepository:
             
         except Exception as e:
             print(f"Error getting sales by month: {str(e)}")
+            return []
+
+    def get_sales_by_day_of_week(self, year: int = None) -> list[dict[str, object]]:
+        """
+        Get sales data grouped by day of the week.
+        
+        Args:
+            year: Filter by specific year (optional)
+            
+        Returns:
+            list[dict]: List with day of week, total_sales, order_count, and day name
+        """
+        try:
+            collection = self._get_collection()
+            if collection is None:
+                return []
+            
+            # Build match stage for year filter
+            match_stage = {}
+            if year:
+                match_stage = {
+                    "created_at": {
+                        "$gte": datetime(year, 1, 1),
+                        "$lt": datetime(year + 1, 1, 1)
+                    }
+                }
+            
+            # MongoDB aggregation pipeline to group by day of week
+            pipeline = [
+                {"$match": match_stage},
+                
+                # Add day of week field (1=Sunday, 2=Monday, ... 7=Saturday)
+                {
+                    "$addFields": {
+                        "dayOfWeek": {"$dayOfWeek": "$created_at"},
+                        "year": {"$year": "$created_at"}
+                    }
+                },
+                
+                # Group by day of week
+                {
+                    "$group": {
+                        "_id": "$dayOfWeek",
+                        "total_sales": {"$sum": {"$toDouble": "$total_price"}},
+                        "total_revenue": {"$sum": {"$toDouble": "$subtotal_price"}},
+                        "total_tax": {"$sum": {"$toDouble": "$total_tax"}},
+                        "total_discounts": {"$sum": {"$toDouble": "$total_discounts"}},
+                        "order_count": {"$sum": 1}
+                    }
+                },
+                
+                # Sort by day of week
+                {"$sort": {"_id": 1}},
+                
+                # Format output with day names
+                {
+                    "$project": {
+                        "day_of_week": "$_id",
+                        "day_name": {
+                            "$switch": {
+                                "branches": [
+                                    {"case": {"$eq": ["$_id", 1]}, "then": "Sunday"},
+                                    {"case": {"$eq": ["$_id", 2]}, "then": "Monday"},
+                                    {"case": {"$eq": ["$_id", 3]}, "then": "Tuesday"},
+                                    {"case": {"$eq": ["$_id", 4]}, "then": "Wednesday"},
+                                    {"case": {"$eq": ["$_id", 5]}, "then": "Thursday"},
+                                    {"case": {"$eq": ["$_id", 6]}, "then": "Friday"},
+                                    {"case": {"$eq": ["$_id", 7]}, "then": "Saturday"}
+                                ],
+                                "default": "Unknown"
+                            }
+                        },
+                        "total_sales": {"$round": ["$total_sales", 2]},
+                        "total_revenue": {"$round": ["$total_revenue", 2]},
+                        "total_tax": {"$round": ["$total_tax", 2]},
+                        "total_discounts": {"$round": ["$total_discounts", 2]},
+                        "order_count": 1,
+                        "_id": 0
+                    }
+                }
+            ]
+            
+            # Execute aggregation
+            result = list(collection.aggregate(pipeline))
+            
+            return result
+            
+        except Exception as e:
+            print(f"Error getting sales by day of week: {str(e)}")
+            return []
+
+    def get_sales_by_hour(self, year: int = None) -> list[dict[str, object]]:
+        """
+        Get sales data grouped by hour of the day.
+        
+        Args:
+            year: Filter by specific year (optional)
+            
+        Returns:
+            list[dict]: List with hour, total_sales, order_count, and time period
+        """
+        try:
+            collection = self._get_collection()
+            if collection is None:
+                return []
+            
+            # Build match stage for year filter
+            match_stage = {}
+            if year:
+                match_stage = {
+                    "created_at": {
+                        "$gte": datetime(year, 1, 1),
+                        "$lt": datetime(year + 1, 1, 1)
+                    }
+                }
+            
+            # MongoDB aggregation pipeline to group by hour
+            pipeline = [
+                {"$match": match_stage},
+                
+                # Add hour field
+                {
+                    "$addFields": {
+                        "hour": {"$hour": "$created_at"},
+                        "year": {"$year": "$created_at"}
+                    }
+                },
+                
+                # Group by hour
+                {
+                    "$group": {
+                        "_id": "$hour",
+                        "total_sales": {"$sum": {"$toDouble": "$total_price"}},
+                        "total_revenue": {"$sum": {"$toDouble": "$subtotal_price"}},
+                        "total_tax": {"$sum": {"$toDouble": "$total_tax"}},
+                        "total_discounts": {"$sum": {"$toDouble": "$total_discounts"}},
+                        "order_count": {"$sum": 1}
+                    }
+                },
+                
+                # Sort by hour
+                {"$sort": {"_id": 1}},
+                
+                # Format output with time periods
+                {
+                    "$project": {
+                        "hour": "$_id",
+                        "time_period": {
+                            "$switch": {
+                                "branches": [
+                                    {"case": {"$and": [{"$gte": ["$_id", 0]}, {"$lt": ["$_id", 6]}]}, "then": "Late Night (12-6 AM)"},
+                                    {"case": {"$and": [{"$gte": ["$_id", 6]}, {"$lt": ["$_id", 12]}]}, "then": "Morning (6 AM-12 PM)"},
+                                    {"case": {"$and": [{"$gte": ["$_id", 12]}, {"$lt": ["$_id", 18]}]}, "then": "Afternoon (12-6 PM)"},
+                                    {"case": {"$and": [{"$gte": ["$_id", 18]}, {"$lt": ["$_id", 24]}]}, "then": "Evening (6 PM-12 AM)"}
+                                ],
+                                "default": "Unknown"
+                            }
+                        },
+                        "formatted_time": {
+                            "$concat": [
+                                {
+                                    "$cond": {
+                                        "if": {"$eq": ["$_id", 0]},
+                                        "then": "12:00 AM",
+                                        "else": {
+                                            "$cond": {
+                                                "if": {"$lt": ["$_id", 12]},
+                                                "then": {"$concat": [{"$toString": "$_id"}, ":00 AM"]},
+                                                "else": {
+                                                    "$cond": {
+                                                        "if": {"$eq": ["$_id", 12]},
+                                                        "then": "12:00 PM",
+                                                        "else": {"$concat": [{"$toString": {"$subtract": ["$_id", 12]}}, ":00 PM"]}
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        "total_sales": {"$round": ["$total_sales", 2]},
+                        "total_revenue": {"$round": ["$total_revenue", 2]},
+                        "total_tax": {"$round": ["$total_tax", 2]},
+                        "total_discounts": {"$round": ["$total_discounts", 2]},
+                        "order_count": 1,
+                        "_id": 0
+                    }
+                }
+            ]
+            
+            # Execute aggregation
+            result = list(collection.aggregate(pipeline))
+            
+            return result
+            
+        except Exception as e:
+            print(f"Error getting sales by hour: {str(e)}")
+            return []
+
+    def get_most_popular_product_combos(self, min_combo_size: int = 2, limit: int = 20) -> list[dict[str, object]]:
+        """
+        Get most popular product combinations from orders.
+        
+        Args:
+            min_combo_size: Minimum number of products in combination (default: 2)
+            limit: Maximum number of combinations to return (default: 20)
+            
+        Returns:
+            list[dict]: List with product combinations, frequency, and total revenue
+        """
+        try:
+            collection = self._get_collection()
+            if collection is None:
+                return []
+            
+            # MongoDB aggregation pipeline to find product combinations
+            pipeline = [
+                # Filter orders that have at least min_combo_size products
+                {
+                    "$match": {
+                        "line_items": {"$size": {"$gte": min_combo_size}}
+                    }
+                },
+                
+                # Create product combinations for each order
+                {
+                    "$addFields": {
+                        "product_ids": {
+                            "$map": {
+                                "input": "$line_items",
+                                "as": "item",
+                                "in": "$$item.product_id"
+                            }
+                        },
+                        "order_total": {"$toDouble": "$total_price"}
+                    }
+                },
+                
+                # Sort product IDs to ensure consistent combination representation
+                {
+                    "$addFields": {
+                        "sorted_product_ids": {
+                            "$sortArray": {
+                                "input": "$product_ids",
+                                "sortBy": 1
+                            }
+                        }
+                    }
+                },
+                
+                # Group by product combination
+                {
+                    "$group": {
+                        "_id": "$sorted_product_ids",
+                        "frequency": {"$sum": 1},
+                        "total_revenue": {"$sum": "$order_total"},
+                        "average_order_value": {"$avg": "$order_total"},
+                        "orders": {"$push": "$order_id"}
+                    }
+                },
+                
+                # Filter combinations with at least the minimum size
+                {
+                    "$match": {
+                        "_id": {"$size": {"$gte": min_combo_size}}
+                    }
+                },
+                
+                # Sort by frequency (most popular first)
+                {"$sort": {"frequency": -1}},
+                
+                # Limit results
+                {"$limit": limit},
+                
+                # Format output
+                {
+                    "$project": {
+                        "product_combination": "$_id",
+                        "combo_size": {"$size": "$_id"},
+                        "frequency": 1,
+                        "total_revenue": {"$round": ["$total_revenue", 2]},
+                        "average_order_value": {"$round": ["$average_order_value", 2]},
+                        "sample_orders": {"$slice": ["$orders", 3]},  # Show first 3 order IDs as examples
+                        "_id": 0
+                    }
+                }
+            ]
+            
+            # Execute aggregation
+            result = list(collection.aggregate(pipeline))
+            
+            return result
+            
+        except Exception as e:
+            print(f"Error getting most popular product combos: {str(e)}")
             return [] 

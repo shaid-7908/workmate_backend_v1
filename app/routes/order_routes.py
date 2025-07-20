@@ -524,4 +524,253 @@ async def get_total_revenue_per_product():
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving product revenue data: {str(e)}"
+        )
+
+@router.get("/analytics/sales/by-day")
+async def get_sales_by_day_of_week(
+    year: Optional[int] = Query(default=None, description="Filter by specific year (e.g., 2024)")
+):
+    """
+    Get sales data grouped by day of the week.
+    
+    Args:
+        year: Filter by specific year (optional)
+        
+    Returns:
+        dict: Sales data grouped by day of week with performance metrics
+        
+    Raises:
+        HTTPException: If error occurs
+    """
+    try:
+        sales_data = order_controller.get_sales_by_day_of_week(year)
+        
+        # Calculate summary statistics and find best/worst days
+        if sales_data:
+            best_day = max(sales_data, key=lambda x: x.get('total_sales', 0))
+            worst_day = min(sales_data, key=lambda x: x.get('total_sales', 0))
+            
+            total_sales = sum(item.get('total_sales', 0) for item in sales_data)
+            total_orders = sum(item.get('order_count', 0) for item in sales_data)
+            
+            return {
+                "success": True,
+                "message": f"Retrieved sales data by day of week{f' for year {year}' if year else ''}",
+                "data": sales_data,
+                "insights": {
+                    "best_day": {
+                        "day": best_day.get('day_name'),
+                        "total_sales": best_day.get('total_sales'),
+                        "order_count": best_day.get('order_count')
+                    },
+                    "worst_day": {
+                        "day": worst_day.get('day_name'),
+                        "total_sales": worst_day.get('total_sales'),
+                        "order_count": worst_day.get('order_count')
+                    },
+                    "performance_ratio": round(best_day.get('total_sales', 0) / worst_day.get('total_sales', 1), 2)
+                },
+                "summary": {
+                    "total_sales": round(total_sales, 2),
+                    "total_orders": total_orders,
+                    "average_daily_sales": round(total_sales / len(sales_data), 2),
+                    "average_daily_orders": round(total_orders / len(sales_data), 2),
+                    "year_filter": year
+                }
+            }
+        else:
+            return {
+                "success": True,
+                "message": "No sales data found",
+                "data": [],
+                "insights": None,
+                "summary": None
+            }
+    except Exception as e:
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving sales data by day: {str(e)}"
+        )
+
+@router.get("/analytics/sales/by-hour")
+async def get_sales_by_hour(
+    year: Optional[int] = Query(default=None, description="Filter by specific year (e.g., 2024)")
+):
+    """
+    Get sales data grouped by hour of the day.
+    
+    Args:
+        year: Filter by specific year (optional)
+        
+    Returns:
+        dict: Sales data grouped by hour with peak performance insights
+        
+    Raises:
+        HTTPException: If error occurs
+    """
+    try:
+        sales_data = order_controller.get_sales_by_hour(year)
+        
+        # Calculate summary statistics and find peak hours
+        if sales_data:
+            peak_hour = max(sales_data, key=lambda x: x.get('total_sales', 0))
+            low_hour = min(sales_data, key=lambda x: x.get('total_sales', 0))
+            
+            # Group by time periods for insights
+            time_periods = {}
+            for item in sales_data:
+                period = item.get('time_period', 'Unknown')
+                if period not in time_periods:
+                    time_periods[period] = {'sales': 0, 'orders': 0}
+                time_periods[period]['sales'] += item.get('total_sales', 0)
+                time_periods[period]['orders'] += item.get('order_count', 0)
+            
+            best_period = max(time_periods.items(), key=lambda x: x[1]['sales'])
+            
+            total_sales = sum(item.get('total_sales', 0) for item in sales_data)
+            total_orders = sum(item.get('order_count', 0) for item in sales_data)
+            
+            return {
+                "success": True,
+                "message": f"Retrieved sales data by hour{f' for year {year}' if year else ''}",
+                "data": sales_data,
+                "insights": {
+                    "peak_hour": {
+                        "hour": peak_hour.get('hour'),
+                        "formatted_time": peak_hour.get('formatted_time'),
+                        "total_sales": peak_hour.get('total_sales'),
+                        "order_count": peak_hour.get('order_count'),
+                        "time_period": peak_hour.get('time_period')
+                    },
+                    "lowest_hour": {
+                        "hour": low_hour.get('hour'),
+                        "formatted_time": low_hour.get('formatted_time'),
+                        "total_sales": low_hour.get('total_sales'),
+                        "order_count": low_hour.get('order_count'),
+                        "time_period": low_hour.get('time_period')
+                    },
+                    "best_time_period": {
+                        "period": best_period[0],
+                        "total_sales": round(best_period[1]['sales'], 2),
+                        "total_orders": best_period[1]['orders']
+                    },
+                    "time_period_breakdown": {k: {"sales": round(v['sales'], 2), "orders": v['orders']} for k, v in time_periods.items()}
+                },
+                "summary": {
+                    "total_sales": round(total_sales, 2),
+                    "total_orders": total_orders,
+                    "average_hourly_sales": round(total_sales / len(sales_data), 2),
+                    "average_hourly_orders": round(total_orders / len(sales_data), 2),
+                    "year_filter": year
+                }
+            }
+        else:
+            return {
+                "success": True,
+                "message": "No sales data found",
+                "data": [],
+                "insights": None,
+                "summary": None
+            }
+    except Exception as e:
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving sales data by hour: {str(e)}"
+        )
+
+@router.get("/analytics/products/combos")
+async def get_most_popular_product_combos(
+    min_combo_size: int = Query(default=2, description="Minimum number of products in combination"),
+    limit: int = Query(default=20, description="Maximum number of combinations to return")
+):
+    """
+    Get most popular product combinations from orders.
+    
+    Args:
+        min_combo_size: Minimum number of products in combination (default: 2)
+        limit: Maximum number of combinations to return (default: 20)
+        
+    Returns:
+        dict: Most popular product combinations with frequency and revenue data
+        
+    Raises:
+        HTTPException: If error occurs
+    """
+    try:
+        combo_data = order_controller.get_most_popular_product_combos(min_combo_size, limit)
+        
+        # Calculate summary statistics
+        if combo_data:
+            total_combinations = len(combo_data)
+            total_combo_revenue = sum(item.get('total_revenue', 0) for item in combo_data)
+            total_combo_frequency = sum(item.get('frequency', 0) for item in combo_data)
+            
+            # Find most valuable combo
+            most_valuable = max(combo_data, key=lambda x: x.get('total_revenue', 0))
+            most_frequent = max(combo_data, key=lambda x: x.get('frequency', 0))
+            
+            # Analyze combo sizes
+            combo_sizes = {}
+            for item in combo_data:
+                size = item.get('combo_size', 0)
+                if size not in combo_sizes:
+                    combo_sizes[size] = {'count': 0, 'total_revenue': 0}
+                combo_sizes[size]['count'] += 1
+                combo_sizes[size]['total_revenue'] += item.get('total_revenue', 0)
+            
+            return {
+                "success": True,
+                "message": f"Retrieved top {total_combinations} product combinations",
+                "data": combo_data,
+                "insights": {
+                    "most_frequent_combo": {
+                        "products": most_frequent.get('product_combination'),
+                        "frequency": most_frequent.get('frequency'),
+                        "total_revenue": most_frequent.get('total_revenue'),
+                        "combo_size": most_frequent.get('combo_size')
+                    },
+                    "most_valuable_combo": {
+                        "products": most_valuable.get('product_combination'),
+                        "frequency": most_valuable.get('frequency'),
+                        "total_revenue": most_valuable.get('total_revenue'),
+                        "combo_size": most_valuable.get('combo_size')
+                    },
+                    "combo_size_breakdown": {
+                        str(k): {
+                            "count": v['count'], 
+                            "total_revenue": round(v['total_revenue'], 2),
+                            "avg_revenue_per_combo": round(v['total_revenue'] / v['count'], 2)
+                        } for k, v in combo_sizes.items()
+                    }
+                },
+                "summary": {
+                    "total_combinations_found": total_combinations,
+                    "total_combo_revenue": round(total_combo_revenue, 2),
+                    "total_combo_frequency": total_combo_frequency,
+                    "average_revenue_per_combo": round(total_combo_revenue / total_combinations, 2),
+                    "average_frequency": round(total_combo_frequency / total_combinations, 2),
+                    "filters": {
+                        "min_combo_size": min_combo_size,
+                        "limit": limit
+                    }
+                }
+            }
+        else:
+            return {
+                "success": True,
+                "message": f"No product combinations found with minimum size {min_combo_size}",
+                "data": [],
+                "insights": None,
+                "summary": {
+                    "total_combinations_found": 0,
+                    "filters": {
+                        "min_combo_size": min_combo_size,
+                        "limit": limit
+                    }
+                }
+            }
+    except Exception as e:
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving product combinations: {str(e)}"
         ) 

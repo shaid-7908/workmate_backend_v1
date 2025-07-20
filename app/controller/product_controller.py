@@ -8,6 +8,7 @@ import requests
 from pprint import pprint
 from datetime import datetime
 
+
 class ProductController:
     """Controller for product business logic."""
     

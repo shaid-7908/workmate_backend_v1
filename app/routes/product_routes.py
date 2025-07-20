@@ -2,6 +2,13 @@ from fastapi import APIRouter, HTTPException, status
 from app.model.product_schema import ProductSchema
 from app.types.product_types import ProductCreateSchema, ProductUpdateSchema
 from app.controller.product_controller import ProductController
+from pydantic import BaseModel
+from typing import Dict, Any
+from app.llmfunc.product_analyzer import ProductAnalyzer
+
+class ProductAnalysisRequest(BaseModel):
+        product_data: Dict[str, Any]
+        analysis_type: str = "comprehensive"
 
 # Create router
 router = APIRouter(
@@ -12,6 +19,21 @@ router = APIRouter(
 
 # Initialize controller
 product_controller = ProductController()
+
+
+@router.post("/ai/analyze-product")
+async def analyze_product(request: ProductAnalysisRequest):
+        """Analyze a product using AI."""
+        try:
+            analyzer = ProductAnalyzer()
+            result = analyzer.analyze_product(
+                request.product_data, 
+                request.analysis_type
+            )
+            return {"success": True, "analysis": result}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_new_product(product_data: ProductCreateSchema):

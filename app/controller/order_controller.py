@@ -335,4 +335,41 @@ class OrderController:
         Returns:
             list[dict]: List with month, year, total_sales, order_count, and month name
         """
-        return self.repository.get_sales_by_month(year) 
+        return self.repository.get_sales_by_month(year)
+
+    def get_sales_by_day_of_week(self, year: int = None) -> list[dict[str, object]]:
+        """
+        Get sales data grouped by day of the week.
+        
+        Args:
+            year: Filter by specific year (optional)
+            
+        Returns:
+            list[dict]: List with day of week, total_sales, order_count, and day name
+        """
+        return self.repository.get_sales_by_day_of_week(year)
+
+    def get_sales_by_hour(self, year: int = None) -> list[dict[str, object]]:
+        """
+        Get sales data grouped by hour of the day.
+        
+        Args:
+            year: Filter by specific year (optional)
+            
+        Returns:
+            list[dict]: List with hour, total_sales, order_count, and time period
+        """
+        return self.repository.get_sales_by_hour(year)
+
+    def get_most_popular_product_combos(self, min_combo_size: int = 2, limit: int = 20) -> list[dict[str, object]]:
+        """
+        Get most popular product combinations from orders.
+        
+        Args:
+            min_combo_size: Minimum number of products in combination (default: 2)
+            limit: Maximum number of combinations to return (default: 20)
+            
+        Returns:
+            list[dict]: List with product combinations, frequency, and total revenue
+        """
+        return self.repository.get_most_popular_product_combos(min_combo_size, limit) 
