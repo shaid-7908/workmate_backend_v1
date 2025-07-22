@@ -774,3 +774,268 @@ async def get_most_popular_product_combos(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving product combinations: {str(e)}"
         ) 
+
+@router.get("/analytics/total-orders")
+async def get_total_orders():
+    """
+    Get the total number of orders and comprehensive order statistics.
+    
+    Returns:
+        dict: Total order count and comprehensive statistics including revenue, tax, discounts, and date range
+        
+    Raises:
+        HTTPException: If error occurs
+    """
+    try:
+        order_stats = order_controller.get_total_orders()
+        
+        # Enhance response with additional insights
+        total_orders = order_stats.get('total_orders', 0)
+        total_revenue = order_stats.get('total_revenue', 0)
+        
+        insights = {}
+        if total_orders > 0:
+            insights = {
+                "revenue_per_order": round(total_revenue / total_orders, 2),
+                "has_order_data": True,
+                "date_range": {
+                    "earliest_order": order_stats.get('earliest_order'),
+                    "latest_order": order_stats.get('latest_order')
+                }
+            }
+        else:
+            insights = {
+                "has_order_data": False,
+                "message": "No orders found in the database"
+            }
+        
+        return {
+            "success": True,
+            "message": f"Total orders: {total_orders}",
+            "data": order_stats,
+            "insights": insights
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving total orders: {str(e)}"
+        )
+
+@router.get("/analytics/average-order-value")
+async def get_average_order_value():
+    """
+    Get the average order value and comprehensive order value statistics.
+    
+    Returns:
+        dict: Average order value with detailed statistics including min/max values, revenue insights
+        
+    Raises:
+        HTTPException: If error occurs
+    """
+    try:
+        aov_stats = order_controller.get_average_order_value()
+        
+        # Enhance response with additional insights and categorization
+        total_orders = aov_stats.get('total_orders', 0)
+        avg_order_value = aov_stats.get('average_order_value', 0)
+        min_value = aov_stats.get('min_order_value', 0)
+        max_value = aov_stats.get('max_order_value', 0)
+        
+        insights = {}
+        if total_orders > 0:
+            # Categorize order value performance
+            if avg_order_value < 50:
+                value_category = "Low"
+            elif avg_order_value < 150:
+                value_category = "Medium"
+            elif avg_order_value < 300:
+                value_category = "High"
+            else:
+                value_category = "Premium"
+            
+            insights = {
+                "value_category": value_category,
+                "value_distribution": {
+                    "range_size": aov_stats.get('order_value_range', 0),
+                    "min_to_avg_ratio": round(min_value / avg_order_value if avg_order_value > 0 else 0, 2),
+                    "max_to_avg_ratio": round(max_value / avg_order_value if avg_order_value > 0 else 0, 2)
+                },
+                "revenue_insights": {
+                    "total_revenue": aov_stats.get('total_revenue', 0),
+                    "revenue_per_order": aov_stats.get('revenue_per_order', 0),
+                    "average_subtotal": aov_stats.get('average_subtotal_value', 0)
+                },
+                "has_order_data": True
+            }
+        else:
+            insights = {
+                "has_order_data": False,
+                "message": "No orders found in the database"
+            }
+        
+        return {
+            "success": True,
+            "message": f"Average order value: ${avg_order_value}",
+            "data": aov_stats,
+            "insights": insights
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving average order value: {str(e)}"
+        )
+
+@router.get("/analytics/monthly-order-data")
+async def get_monthly_order_data(
+    year: Optional[int] = Query(default=None, description="Filter by specific year (e.g., 2024)")
+):
+    """
+    Get monthly order data with total orders, total revenue, and average order value per month.
+    
+    Args:
+        year: Filter by specific year (optional)
+        
+    Returns:
+        dict: Monthly order data with comprehensive statistics and insights
+        
+    Raises:
+        HTTPException: If error occurs
+    """
+    try:
+        monthly_data = order_controller.get_monthly_order_data(year)
+        
+        # Calculate comprehensive summary statistics
+        if monthly_data:
+            # Overall totals
+            total_orders_all_months = sum(item.get('total_orders', 0) for item in monthly_data)
+            total_revenue_all_months = sum(item.get('total_revenue', 0) for item in monthly_data)
+            total_sales_all_months = sum(item.get('total_sales', 0) for item in monthly_data)
+            
+            # Calculate overall average order value
+            overall_aov = round(total_sales_all_months / total_orders_all_months if total_orders_all_months > 0 else 0, 2)
+            
+            # Find best and worst performing months
+            best_revenue_month = max(monthly_data, key=lambda x: x.get('total_revenue', 0))
+            worst_revenue_month = min(monthly_data, key=lambda x: x.get('total_revenue', 0))
+            
+            best_orders_month = max(monthly_data, key=lambda x: x.get('total_orders', 0))
+            worst_orders_month = min(monthly_data, key=lambda x: x.get('total_orders', 0))
+            
+            best_aov_month = max(monthly_data, key=lambda x: x.get('average_order_value', 0))
+            worst_aov_month = min(monthly_data, key=lambda x: x.get('average_order_value', 0))
+            
+            # Calculate growth trends (comparing consecutive months)
+            growth_trends = []
+            for i in range(1, len(monthly_data)):
+                prev_month = monthly_data[i-1]
+                curr_month = monthly_data[i]
+                
+                revenue_growth = ((curr_month.get('total_revenue', 0) - prev_month.get('total_revenue', 0)) / prev_month.get('total_revenue', 1)) * 100
+                orders_growth = ((curr_month.get('total_orders', 0) - prev_month.get('total_orders', 0)) / prev_month.get('total_orders', 1)) * 100
+                aov_growth = ((curr_month.get('average_order_value', 0) - prev_month.get('average_order_value', 0)) / prev_month.get('average_order_value', 1)) * 100
+                
+                growth_trends.append({
+                    "month": curr_month.get('month_name'),
+                    "year": curr_month.get('year'),
+                    "revenue_growth_percent": round(revenue_growth, 2),
+                    "orders_growth_percent": round(orders_growth, 2),
+                    "aov_growth_percent": round(aov_growth, 2)
+                })
+            
+            # Monthly averages
+            total_months = len(monthly_data)
+            avg_orders_per_month = round(total_orders_all_months / total_months, 1)
+            avg_revenue_per_month = round(total_revenue_all_months / total_months, 2)
+            
+            return {
+                "success": True,
+                "message": f"Retrieved monthly order data for {total_months} months{f' in {year}' if year else ''}",
+                "data": monthly_data,
+                "insights": {
+                    "best_performance": {
+                        "highest_revenue_month": {
+                            "month": best_revenue_month.get('month_name'),
+                            "year": best_revenue_month.get('year'),
+                            "total_revenue": best_revenue_month.get('total_revenue'),
+                            "total_orders": best_revenue_month.get('total_orders'),
+                            "average_order_value": best_revenue_month.get('average_order_value')
+                        },
+                        "highest_orders_month": {
+                            "month": best_orders_month.get('month_name'),
+                            "year": best_orders_month.get('year'),
+                            "total_orders": best_orders_month.get('total_orders'),
+                            "total_revenue": best_orders_month.get('total_revenue'),
+                            "average_order_value": best_orders_month.get('average_order_value')
+                        },
+                        "highest_aov_month": {
+                            "month": best_aov_month.get('month_name'),
+                            "year": best_aov_month.get('year'),
+                            "average_order_value": best_aov_month.get('average_order_value'),
+                            "total_orders": best_aov_month.get('total_orders'),
+                            "total_revenue": best_aov_month.get('total_revenue')
+                        }
+                    },
+                    "worst_performance": {
+                        "lowest_revenue_month": {
+                            "month": worst_revenue_month.get('month_name'),
+                            "year": worst_revenue_month.get('year'),
+                            "total_revenue": worst_revenue_month.get('total_revenue')
+                        },
+                        "lowest_orders_month": {
+                            "month": worst_orders_month.get('month_name'),
+                            "year": worst_orders_month.get('year'),
+                            "total_orders": worst_orders_month.get('total_orders')
+                        },
+                        "lowest_aov_month": {
+                            "month": worst_aov_month.get('month_name'),
+                            "year": worst_aov_month.get('year'),
+                            "average_order_value": worst_aov_month.get('average_order_value')
+                        }
+                    },
+                    "growth_trends": growth_trends[-3:] if len(growth_trends) > 3 else growth_trends  # Show last 3 months growth
+                },
+                "summary": {
+                    "total_months_analyzed": total_months,
+                    "total_orders_all_months": total_orders_all_months,
+                    "total_revenue_all_months": round(total_revenue_all_months, 2),
+                    "total_sales_all_months": round(total_sales_all_months, 2),
+                    "overall_average_order_value": overall_aov,
+                    "average_orders_per_month": avg_orders_per_month,
+                    "average_revenue_per_month": avg_revenue_per_month,
+                    "revenue_range": {
+                        "highest_month_revenue": best_revenue_month.get('total_revenue'),
+                        "lowest_month_revenue": worst_revenue_month.get('total_revenue'),
+                        "range": round(best_revenue_month.get('total_revenue', 0) - worst_revenue_month.get('total_revenue', 0), 2)
+                    },
+                    "orders_range": {
+                        "highest_month_orders": best_orders_month.get('total_orders'),
+                        "lowest_month_orders": worst_orders_month.get('total_orders'),
+                        "range": best_orders_month.get('total_orders', 0) - worst_orders_month.get('total_orders', 0)
+                    },
+                    "aov_range": {
+                        "highest_month_aov": best_aov_month.get('average_order_value'),
+                        "lowest_month_aov": worst_aov_month.get('average_order_value'),
+                        "range": round(best_aov_month.get('average_order_value', 0) - worst_aov_month.get('average_order_value', 0), 2)
+                    },
+                    "year_filter": year
+                }
+            }
+        else:
+            return {
+                "success": True,
+                "message": f"No monthly order data found{f' for year {year}' if year else ''}",
+                "data": [],
+                "insights": None,
+                "summary": {
+                    "total_months_analyzed": 0,
+                    "total_orders_all_months": 0,
+                    "total_revenue_all_months": 0,
+                    "overall_average_order_value": 0,
+                    "year_filter": year
+                }
+            }
+    except Exception as e:
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving monthly order data: {str(e)}"
+        ) 

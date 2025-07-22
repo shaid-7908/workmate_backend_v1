@@ -302,7 +302,7 @@ class OrderRepository:
             print(f"Error getting all orders: {str(e)}")
             return [] 
 
-    def get_total_units_sold_per_product(self) -> list[dict[str, object]]:
+    def get_total_units_sold_per_product(self,limit: int = 100) -> list[dict[str, object]]:
         """
         Get total units sold per product by aggregating all order line items.
         
@@ -331,7 +331,7 @@ class OrderRepository:
                 
                 # Sort by total quantity sold in descending order
                 {"$sort": {"total_quantity_sold": -1}},
-                
+                {"$limit": limit},
                 # Rename _id field to product_id for clarity
                 {
                     "$project": {
@@ -955,4 +955,252 @@ class OrderRepository:
             
         except Exception as e:
             print(f"Error getting most popular product combos: {str(e)}")
+            return [] 
+
+    def get_total_orders(self) -> dict[str, object]:
+        """
+        Get the total number of orders in the database.
+        
+        Returns:
+            dict: Total order count and additional statistics
+        """
+        try:
+            collection = self._get_collection()
+            if collection is None:
+                return {"total_orders": 0}
+            
+            # MongoDB aggregation pipeline to get comprehensive order statistics
+            pipeline = [
+                {
+                    "$group": {
+                        "_id": None,
+                        "total_orders": {"$sum": 1},
+                        "total_revenue": {"$sum": {"$toDouble": "$total_price"}},
+                        "total_subtotal": {"$sum": {"$toDouble": "$subtotal_price"}},
+                        "total_tax": {"$sum": {"$toDouble": "$total_tax"}},
+                        "total_discounts": {"$sum": {"$toDouble": "$total_discounts"}},
+                        "earliest_order": {"$min": "$created_at"},
+                        "latest_order": {"$max": "$created_at"}
+                    }
+                },
+                {
+                    "$project": {
+                        "total_orders": 1,
+                        "total_revenue": {"$round": ["$total_revenue", 2]},
+                        "total_subtotal": {"$round": ["$total_subtotal", 2]},
+                        "total_tax": {"$round": ["$total_tax", 2]},
+                        "total_discounts": {"$round": ["$total_discounts", 2]},
+                        "earliest_order": {"$dateToString": {"format": "%Y-%m-%d", "date": "$earliest_order"}},
+                        "latest_order": {"$dateToString": {"format": "%Y-%m-%d", "date": "$latest_order"}},
+                        "_id": 0
+                    }
+                }
+            ]
+            
+            # Execute aggregation
+            result = list(collection.aggregate(pipeline))
+            
+            if result:
+                return result[0]
+            else:
+                return {"total_orders": 0}
+            
+        except Exception as e:
+            print(f"Error getting total orders: {str(e)}")
+            return {"total_orders": 0}
+
+    def get_average_order_value(self) -> dict[str, object]:
+        """
+        Get the average order value and related statistics.
+        
+        Returns:
+            dict: Average order value and comprehensive order value statistics
+        """
+        try:
+            collection = self._get_collection()
+            if collection is None:
+                return {"average_order_value": 0}
+            
+            # MongoDB aggregation pipeline to calculate order value statistics
+            pipeline = [
+                {
+                    "$addFields": {
+                        "order_value": {"$toDouble": "$total_price"},
+                        "subtotal_value": {"$toDouble": "$subtotal_price"}
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": None,
+                        "total_orders": {"$sum": 1},
+                        "total_revenue": {"$sum": "$order_value"},
+                        "total_subtotal": {"$sum": "$subtotal_value"},
+                        "average_order_value": {"$avg": "$order_value"},
+                        "average_subtotal_value": {"$avg": "$subtotal_value"},
+                        "min_order_value": {"$min": "$order_value"},
+                        "max_order_value": {"$max": "$order_value"},
+                        "median_calculation": {"$push": "$order_value"}
+                    }
+                },
+                {
+                    "$project": {
+                        "total_orders": 1,
+                        "total_revenue": {"$round": ["$total_revenue", 2]},
+                        "total_subtotal": {"$round": ["$total_subtotal", 2]},
+                        "average_order_value": {"$round": ["$average_order_value", 2]},
+                        "average_subtotal_value": {"$round": ["$average_subtotal_value", 2]},
+                        "min_order_value": {"$round": ["$min_order_value", 2]},
+                        "max_order_value": {"$round": ["$max_order_value", 2]},
+                        "order_value_range": {"$round": [{"$subtract": ["$max_order_value", "$min_order_value"]}, 2]},
+                        "_id": 0
+                    }
+                }
+            ]
+            
+            # Execute aggregation
+            result = list(collection.aggregate(pipeline))
+            
+            if result and result[0]["total_orders"] > 0:
+                stats = result[0]
+                
+                # Calculate additional insights
+                if stats["total_orders"] > 0:
+                    stats["revenue_per_order"] = round(stats["total_revenue"] / stats["total_orders"], 2)
+                
+                return stats
+            else:
+                return {
+                    "total_orders": 0,
+                    "average_order_value": 0,
+                    "total_revenue": 0,
+                    "min_order_value": 0,
+                    "max_order_value": 0
+                }
+            
+        except Exception as e:
+            print(f"Error getting average order value: {str(e)}")
+            return {"average_order_value": 0}
+
+    def get_monthly_order_data(self, year: int = None) -> list[dict[str, object]]:
+        """
+        Get monthly order data with total orders, total revenue, and average order value per month.
+        
+        Args:
+            year: Filter by specific year (optional)
+            
+        Returns:
+            list[dict]: List with monthly order statistics including total orders, revenue, and AOV
+        """
+        try:
+            collection = self._get_collection()
+            if collection is None:
+                return []
+            
+            # Build match stage for year filter
+            match_stage = {}
+            if year:
+                match_stage = {
+                    "created_at": {
+                        "$gte": datetime(year, 1, 1),
+                        "$lt": datetime(year + 1, 1, 1)
+                    }
+                }
+            
+            # MongoDB aggregation pipeline to get monthly order data
+            pipeline = [
+                {"$match": match_stage},
+                
+                # Add month and year fields
+                {
+                    "$addFields": {
+                        "month": {"$month": "$created_at"},
+                        "year": {"$year": "$created_at"},
+                        "order_value": {"$toDouble": "$total_price"},
+                        "revenue_value": {"$toDouble": "$subtotal_price"}
+                    }
+                },
+                
+                # Group by year and month
+                {
+                    "$group": {
+                        "_id": {
+                            "year": "$year",
+                            "month": "$month"
+                        },
+                        "total_orders": {"$sum": 1},
+                        "total_revenue": {"$sum": "$revenue_value"},
+                        "total_sales": {"$sum": "$order_value"},
+                        "total_tax": {"$sum": {"$toDouble": "$total_tax"}},
+                        "total_discounts": {"$sum": {"$toDouble": "$total_discounts"}},
+                        "average_order_value": {"$avg": "$order_value"},
+                        "min_order_value": {"$min": "$order_value"},
+                        "max_order_value": {"$max": "$order_value"},
+                        "month_start": {"$min": "$created_at"},
+                        "month_end": {"$max": "$created_at"}
+                    }
+                },
+                
+                # Sort by year and month
+                {"$sort": {"_id.year": 1, "_id.month": 1}},
+                
+                # Format output with month names and calculations
+                {
+                    "$project": {
+                        "year": "$_id.year",
+                        "month": "$_id.month",
+                        "month_name": {
+                            "$switch": {
+                                "branches": [
+                                    {"case": {"$eq": ["$_id.month", 1]}, "then": "January"},
+                                    {"case": {"$eq": ["$_id.month", 2]}, "then": "February"},
+                                    {"case": {"$eq": ["$_id.month", 3]}, "then": "March"},
+                                    {"case": {"$eq": ["$_id.month", 4]}, "then": "April"},
+                                    {"case": {"$eq": ["$_id.month", 5]}, "then": "May"},
+                                    {"case": {"$eq": ["$_id.month", 6]}, "then": "June"},
+                                    {"case": {"$eq": ["$_id.month", 7]}, "then": "July"},
+                                    {"case": {"$eq": ["$_id.month", 8]}, "then": "August"},
+                                    {"case": {"$eq": ["$_id.month", 9]}, "then": "September"},
+                                    {"case": {"$eq": ["$_id.month", 10]}, "then": "October"},
+                                    {"case": {"$eq": ["$_id.month", 11]}, "then": "November"},
+                                    {"case": {"$eq": ["$_id.month", 12]}, "then": "December"}
+                                ],
+                                "default": "Unknown"
+                            }
+                        },
+                        "year_month": {
+                            "$concat": [
+                                {"$toString": "$_id.year"},
+                                "-",
+                                {
+                                    "$cond": {
+                                        "if": {"$lt": ["$_id.month", 10]},
+                                        "then": {"$concat": ["0", {"$toString": "$_id.month"}]},
+                                        "else": {"$toString": "$_id.month"}
+                                    }
+                                }
+                            ]
+                        },
+                        "total_orders": 1,
+                        "total_revenue": {"$round": ["$total_revenue", 2]},
+                        "total_sales": {"$round": ["$total_sales", 2]},
+                        "total_tax": {"$round": ["$total_tax", 2]},
+                        "total_discounts": {"$round": ["$total_discounts", 2]},
+                        "average_order_value": {"$round": ["$average_order_value", 2]},
+                        "min_order_value": {"$round": ["$min_order_value", 2]},
+                        "max_order_value": {"$round": ["$max_order_value", 2]},
+                        "order_value_range": {"$round": [{"$subtract": ["$max_order_value", "$min_order_value"]}, 2]},
+                        "month_start": {"$dateToString": {"format": "%Y-%m-%d", "date": "$month_start"}},
+                        "month_end": {"$dateToString": {"format": "%Y-%m-%d", "date": "$month_end"}},
+                        "_id": 0
+                    }
+                }
+            ]
+            
+            # Execute aggregation
+            result = list(collection.aggregate(pipeline))
+            
+            return result
+            
+        except Exception as e:
+            print(f"Error getting monthly order data: {str(e)}")
             return [] 

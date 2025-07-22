@@ -21,7 +21,7 @@ router = APIRouter(
 product_controller = ProductController()
 
 
-@router.post("/ai/analyze-product")
+@router.post("/ai-1/analyze-product")
 async def analyze_product(request: ProductAnalysisRequest):
         """Analyze a product using AI."""
         try:

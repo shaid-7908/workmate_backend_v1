@@ -170,7 +170,7 @@ class ProductController:
         # For now, return False to indicate not implemented
         return False
 
-    def get_total_units_sold_per_product(self) -> list[dict[str, object]]:
+    def get_total_units_sold_per_product(self,limit: int = 100) -> list[dict[str, object]]:
         """
         Get total units sold per product by aggregating all order line items.
         
@@ -178,7 +178,7 @@ class ProductController:
             list[dict]: List with product_id, total_quantity_sold, and total_orders
         """
         print("Getting total units sold per product")
-        return self.order_repository.get_total_units_sold_per_product()
+        return self.order_repository.get_total_units_sold_per_product(limit)
 
     def get_total_revenue_per_product(self) -> list[dict[str, object]]:
         """

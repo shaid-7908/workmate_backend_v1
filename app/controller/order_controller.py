@@ -373,3 +373,33 @@ class OrderController:
             list[dict]: List with product combinations, frequency, and total revenue
         """
         return self.repository.get_most_popular_product_combos(min_combo_size, limit) 
+
+    def get_total_orders(self) -> dict[str, object]:
+        """
+        Get the total number of orders and comprehensive order statistics.
+        
+        Returns:
+            dict: Total order count and additional statistics including revenue, dates, etc.
+        """
+        return self.repository.get_total_orders()
+
+    def get_average_order_value(self) -> dict[str, object]:
+        """
+        Get the average order value and comprehensive order value statistics.
+        
+        Returns:
+            dict: Average order value, min/max values, and other order value insights
+        """
+        return self.repository.get_average_order_value()
+
+    def get_monthly_order_data(self, year: int = None) -> list[dict[str, object]]:
+        """
+        Get monthly order data with total orders, total revenue, and average order value per month.
+        
+        Args:
+            year: Filter by specific year (optional)
+            
+        Returns:
+            list[dict]: List with monthly order statistics including total orders, revenue, and AOV
+        """
+        return self.repository.get_monthly_order_data(year) 
